@@ -7,9 +7,9 @@ from app.core.db import make_session_factory
 from app.products.models import Product
 
 SEED_PRODUCTS = (
-    ("Tea", Decimal("2.50"), 100),
-    ("Coffee", Decimal("4.00"), 50),
-    ("Honey", Decimal("6.75"), 30),
+    ("Choy", Decimal("15000.00"), 100),
+    ("Qahva", Decimal("25000.00"), 50),
+    ("Asal", Decimal("45000.00"), 30),
 )
 
 

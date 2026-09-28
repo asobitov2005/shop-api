@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -11,11 +11,15 @@ class Order(Base):
     __tablename__ = "orders"
     __table_args__ = (
         CheckConstraint("status IN ('pending', 'paid', 'cancelled')", name="ck_orders_status"),
+        CheckConstraint("currency = 'UZS'", name="ck_orders_currency_uzs"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(
+        String(3), nullable=False, default="UZS", server_default=text("'UZS'")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )

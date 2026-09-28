@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
@@ -22,5 +22,6 @@ class OrderView(BaseModel):
     id: int
     status: str
     total_amount: Decimal
+    currency: Literal["UZS"]
     expires_at: datetime
     payment_url: None = None

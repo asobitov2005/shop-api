@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -9,6 +10,7 @@ class ProductView(BaseModel):
     id: int
     name: str
     price: Decimal
+    currency: Literal["UZS"]
     stock: int
 
 

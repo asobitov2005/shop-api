@@ -8,7 +8,7 @@ from app.products.models import Product
 
 
 def test_order_combines_duplicates_and_snapshots_server_price(client, db_session, seed_products):
-    product = seed_products(Product(name="Tea", price=Decimal("2.50"), stock=8))[0]
+    product = seed_products(Product(name="Choy", price=Decimal("15000.00"), stock=8))[0]
     db_session.commit()
 
     response = client.post(
@@ -26,10 +26,11 @@ def test_order_combines_duplicates_and_snapshots_server_price(client, db_session
     item = db_session.scalar(select(OrderItem))
     db_session.refresh(product)
     assert response.json()["status"] == "pending"
-    assert response.json()["total_amount"] == "12.50"
+    assert response.json()["currency"] == "UZS"
+    assert response.json()["total_amount"] == "75000.00"
     assert response.json()["payment_url"] is None
     assert item.quantity == 5
-    assert item.unit_price == Decimal("2.50")
+    assert item.unit_price == Decimal("15000.00")
     assert product.stock == 3
     assert order.expires_at > order.created_at
 

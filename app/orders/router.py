@@ -20,5 +20,6 @@ def post_order(
         id=order.id,
         status=order.status,
         total_amount=order.total_amount,
+        currency=order.currency,
         expires_at=order.expires_at,
     )
