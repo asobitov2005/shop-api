@@ -13,7 +13,7 @@ docker compose run --rm api ruff check .
 docker compose run --rm api ruff format --check .
 ```
 
-The API is at `http://localhost:58000/docs`; `/` opens the shop. API startup applies Alembic migrations automatically. Choy, Qahva and Asal each sell for 1,000 UZS. The database keeps each original price and discount amount, and the seed is idempotent. Tests use a dedicated `_test` PostgreSQL database and separate Redis database.
+The API is at `http://localhost:58000/docs` by default; `/` opens the shop. Docker image versions, ports and local database settings can be changed in a private `.env` using `.env.example` as a guide. API startup applies Alembic migrations automatically. Choy, Qahva and Asal each sell for 1,000 UZS. The database keeps each original price and discount amount, and the seed is idempotent. Tests use a dedicated `_test` PostgreSQL database and separate Redis database.
 
 Copy `.env.example` to a private `.env` to configure Click. Never commit merchant keys. The simulated payment callback uses `TASK_WEBHOOK_SECRET`: sign the exact JSON request bytes with HMAC-SHA256 and send the lowercase hex digest as `X-Signature`. Callback `status` values are `success` and `failed`; failure cancels a pending order and releases stock.
 
