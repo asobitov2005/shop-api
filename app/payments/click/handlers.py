@@ -1,3 +1,4 @@
+import logging
 import secrets
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
@@ -30,6 +31,7 @@ PAID_ERROR = (-4, "Transaction already confirmed")
 ORDER_ERROR = (-5, "Order does not exist")
 PREPARE_ERROR = (-6, "Prepare transaction does not exist")
 CANCELLED_ERROR = (-9, "Transaction cancelled")
+logger = logging.getLogger(__name__)
 
 
 def _positive_int(value: str) -> int | None:
@@ -247,6 +249,14 @@ def process_complete(
     transaction.click_paydoc_id = paydoc_id
     transaction.processed_at = now
     session.commit()
+    if transaction.recovery_status == "manual_review":
+        logger.warning(
+            "Click settlement requires manual review: order_id=%s click_trans_id=%s "
+            "click_paydoc_id=%s",
+            order.id,
+            transaction.external_id,
+            transaction.click_paydoc_id,
+        )
     if restored:
         cache.invalidate()
     if error < 0:
