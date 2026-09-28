@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 
 class ProductView(BaseModel):
@@ -10,8 +10,14 @@ class ProductView(BaseModel):
     id: int
     name: str
     price: Decimal
+    discount_amount: Decimal
     currency: Literal["UZS"]
     stock: int
+
+    @computed_field
+    @property
+    def original_price(self) -> Decimal:
+        return self.price + self.discount_amount
 
 
 class ProductPage(BaseModel):

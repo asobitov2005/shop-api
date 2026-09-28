@@ -3,6 +3,11 @@ const quantities = new Map();
 const grid = document.querySelector("#product-grid");
 const notice = document.querySelector("#notice");
 const checkoutButton = document.querySelector("#checkout-button");
+const productImages = {
+  choy: "/static/products/tea.svg",
+  qahva: "/static/products/coffee.svg",
+  asal: "/static/products/honey.svg",
+};
 
 const formatMoney = (value) => `${new Intl.NumberFormat("uz-UZ").format(Number(value))} so‘m`;
 const escapeText = (value) => String(value).replace(/[&<>"']/g, (char) => ({
@@ -20,10 +25,11 @@ function renderProducts() {
     const quantity = quantities.get(product.id) || 0;
     const stock = Number(product.stock);
     const stockLabel = stock === 0 ? "Tugagan" : stock < 5 ? `Faqat ${stock} ta qoldi` : "Mavjud";
+    const image = productImages[String(product.name).toLocaleLowerCase("uz")] || "/static/products/item.svg";
     return `<article class="product-card">
-      <div class="product-top"><span class="product-icon" aria-hidden="true">✳</span><span class="stock ${stock > 0 && stock < 5 ? "low" : ""}">${stockLabel}</span></div>
+      <div class="product-art"><img src="${image}" alt="${escapeText(product.name)}"><span class="stock ${stock > 0 && stock < 5 ? "low" : ""}">${stockLabel}</span></div>
       <h3>${escapeText(product.name)}</h3>
-      <div class="product-bottom"><span class="price">${formatMoney(product.price)} <small>/ dona</small></span>
+      <div class="product-bottom"><span class="price"><strong>${formatMoney(product.price)}</strong><del>${formatMoney(product.original_price)}</del><small>/ dona</small></span>
         <div class="stepper" aria-label="${escapeText(product.name)} miqdori">
           <button type="button" data-action="minus" data-id="${product.id}" aria-label="Kamaytirish" ${quantity === 0 ? "disabled" : ""}>−</button>
           <output>${quantity}</output>

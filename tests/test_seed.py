@@ -21,11 +21,19 @@ def test_seed_creates_uzbek_catalog_with_uzs_prices(test_engine, test_settings, 
         products = session.scalars(select(Product).order_by(Product.name)).all()
 
     assert [
-        (product.name, product.price, product.currency, product.stock) for product in products
+        (
+            product.name,
+            product.price,
+            product.discount_amount,
+            product.original_price,
+            product.currency,
+            product.stock,
+        )
+        for product in products
     ] == [
-        ("Asal", Decimal("45000.00"), "UZS", 30),
-        ("Choy", Decimal("15000.00"), "UZS", 100),
-        ("Qahva", Decimal("25000.00"), "UZS", 50),
+        ("Asal", Decimal("1000.00"), Decimal("44000.00"), Decimal("45000.00"), "UZS", 30),
+        ("Choy", Decimal("1000.00"), Decimal("14000.00"), Decimal("15000.00"), "UZS", 100),
+        ("Qahva", Decimal("1000.00"), Decimal("24000.00"), Decimal("25000.00"), "UZS", 50),
     ]
 
 
@@ -37,6 +45,13 @@ def test_database_rejects_non_uzs_product_and_order_currency(db_session):
 
     invalid_rows = (
         Product(name="Invalid product", price=1, stock=1, currency="USD"),
+        Product(
+            name="Invalid discount",
+            price=1000,
+            original_price=15000,
+            discount_amount=13000,
+            stock=1,
+        ),
         Order(status="pending", total_amount=1, currency="USD"),
     )
     for row in invalid_rows:

@@ -21,6 +21,8 @@ def test_products_are_paginated_and_cached(client, db_session, seed_products):
     assert [item["name"] for item in first.json()["items"]] == ["Product 1", "Product 2"]
     assert [item["name"] for item in second.json()["items"]] == ["Product 3", "Product 4"]
     assert first.json()["items"][0]["price"] == "3.25"
+    assert first.json()["items"][0]["original_price"] == "3.25"
+    assert first.json()["items"][0]["discount_amount"] == "0.00"
     assert first.json()["items"][0]["currency"] == "UZS"
 
 
