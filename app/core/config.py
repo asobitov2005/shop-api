@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     test_database_url: str = "postgresql+psycopg://app:app@localhost:55433/app_test"
     redis_url: str = "redis://localhost:56380/0"
     test_redis_url: str = "redis://localhost:56380/1"
-    task_webhook_secret: str = "local-task-webhook-secret"
+    task_webhook_secret: str = Field(min_length=1)
     app_root_path: str = ""
     click_merchant_id: str | None = None
     click_service_id: str | None = None

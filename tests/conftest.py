@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
+os.environ.setdefault("TASK_WEBHOOK_SECRET", "local-task-webhook-secret")
+
 from app.core.config import Settings
 from app.core.db import Base, get_session
 from app.main import create_app

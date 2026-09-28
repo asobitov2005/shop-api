@@ -41,7 +41,7 @@ def _same_business_request(transaction: PaymentTransaction, payload: TaskCallbac
     )
 
 
-def _existing_response(session: Session, payload: TaskCallback) -> CallbackResponse:
+def _existing_response(session: Session, payload: TaskCallback) -> CallbackResponse | None:
     try:
         transaction = session.scalar(
             select(PaymentTransaction).where(
@@ -49,7 +49,9 @@ def _existing_response(session: Session, payload: TaskCallback) -> CallbackRespo
                 PaymentTransaction.external_id == payload.transaction_id,
             )
         )
-        if transaction is None or not _same_business_request(transaction, payload):
+        if transaction is None:
+            return None
+        if not _same_business_request(transaction, payload):
             raise HTTPException(status_code=409, detail="Conflicting transaction")
         return _response(transaction)
     finally:
@@ -59,6 +61,10 @@ def _existing_response(session: Session, payload: TaskCallback) -> CallbackRespo
 def process_task_callback(
     session: Session, payload: TaskCallback, cache: ProductCache, *, now: datetime | None = None
 ) -> CallbackResponse:
+    replay = _existing_response(session, payload)
+    if replay is not None:
+        return replay
+
     order = session.scalar(select(Order).where(Order.id == payload.order_id).with_for_update())
     if order is None:
         session.rollback()
@@ -112,9 +118,12 @@ def process_task_callback(
         session.flush()
         response = _response(transaction)
         session.commit()
-    except IntegrityError:
+    except IntegrityError as error:
         session.rollback()
-        return _existing_response(session, payload)
+        replay = _existing_response(session, payload)
+        if replay is None:
+            raise HTTPException(status_code=409, detail="Conflicting transaction") from error
+        return replay
 
     if payload.status == "failed" and response.status == "cancelled":
         cache.invalidate()

@@ -157,3 +157,20 @@ def test_reused_transaction_id_cannot_move_to_another_order(client, db_session, 
     db_session.expire_all()
     assert db_session.get(Order, second_order_id).status == "pending"
     assert db_session.get(Product, second_product_id).stock == 2
+
+
+def test_reused_transaction_id_with_nonexistent_order_conflicts(client, db_session, redis_client):
+    order_id, _ = make_order(db_session, redis_client)
+    payload = {
+        "transaction_id": "txn-missing-order",
+        "order_id": order_id,
+        "amount": "12.50",
+        "status": "success",
+    }
+    assert send_callback(client, payload).status_code == 200
+
+    changed = send_callback(client, {**payload, "order_id": 999999})
+
+    assert changed.status_code == 409
+    db_session.expire_all()
+    assert db_session.get(Order, order_id).status == "paid"

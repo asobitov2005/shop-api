@@ -57,6 +57,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://app:app@db:5432/app}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      TASK_WEBHOOK_SECRET: ${TASK_WEBHOOK_SECRET:-local-task-webhook-secret}
     command: ["uv", "run", "python", "-m", "app.worker.main"]
     depends_on:
       api:
