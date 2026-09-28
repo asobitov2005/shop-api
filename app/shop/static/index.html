@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f5ef">
+    <meta name="description" content="Yaqin — kundalik uchun tanlangan mahsulotlar.">
+    <title>Yaqin — kichik do‘kon</title>
+    <link rel="stylesheet" href="/static/shop.css">
+    <script src="/static/shop.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Yaqin bosh sahifa"><span class="brand-mark">Y</span> yaqin</a>
+      <span class="top-note">Mahalliy. Oddiy. Yaxshi.</span>
+      <a class="bag-link" href="#buyurtma">Savatcha <span id="item-count">0</span></a>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="intro-title">
+        <p class="eyebrow">KUNLIK TANLOV</p>
+        <h1 id="intro-title">Yaxshi narsalar,<br><em>yaqin joyda.</em></h1>
+        <p class="intro-copy">Har kuni uchun kerakli, o‘zimiz yoqtirgan mahsulotlar. Tanlang va Click orqali xavfsiz to‘lang.</p>
+        <a class="shop-link" href="#mahsulotlar">Mahsulotlarni ko‘rish <span aria-hidden="true">↓</span></a>
+        <div class="stamp" aria-hidden="true"><span>YANGI<br>TANLOV</span><b>✳</b></div>
+      </section>
+
+      <section class="catalog" id="mahsulotlar" aria-labelledby="catalog-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">DO‘KON</p><h2 id="catalog-title">Bugungi tanlov</h2></div>
+          <span class="catalog-count" id="catalog-count">Yuklanmoqda…</span>
+        </div>
+        <div class="product-grid" id="product-grid" aria-live="polite">
+          <p class="loading">Mahsulotlar yuklanmoqda…</p>
+        </div>
+      </section>
+
+      <section class="checkout" id="buyurtma" aria-labelledby="checkout-title">
+        <div><p class="eyebrow">BUYURTMA</p><h2 id="checkout-title">Tanlovingiz tayyor?</h2><p class="checkout-note">To‘lov Click sahifasida amalga oshiriladi.</p></div>
+        <div class="checkout-action"><strong id="order-total">0 so‘m</strong><button id="checkout-button" type="button" disabled>Click orqali to‘lash <span aria-hidden="true">↗</span></button></div>
+      </section>
+      <p class="notice" id="notice" role="status" aria-live="polite"></p>
+    </main>
+
+    <footer><a class="brand" href="/"><span class="brand-mark">Y</span> yaqin</a><span>To‘lov xavfsiz Click sahifasida amalga oshadi.</span></footer>
+  </body>
+</html>
