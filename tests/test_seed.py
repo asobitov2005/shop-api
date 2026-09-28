@@ -44,3 +44,31 @@ def test_database_rejects_non_uzs_product_and_order_currency(db_session):
             with db_session.begin_nested():
                 db_session.add(row)
                 db_session.flush()
+
+
+def test_seed_invalidates_empty_product_page_once_after_insert(
+    client, redis_client, test_settings, monkeypatch
+):
+    from app.products.cache import VERSION_KEY
+
+    monkeypatch.setattr(
+        seed_module,
+        "get_settings",
+        lambda: test_settings.model_copy(
+            update={
+                "database_url": test_settings.test_database_url,
+                "redis_url": test_settings.test_redis_url,
+            }
+        ),
+    )
+    assert client.get("/products").json()["items"] == []
+
+    seed_module.seed()
+
+    products = client.get("/products").json()["items"]
+    assert [product["name"] for product in products] == ["Choy", "Qahva", "Asal"]
+    assert all(product["currency"] == "UZS" for product in products)
+    assert redis_client.get(VERSION_KEY) == "1"
+
+    seed_module.seed()
+    assert redis_client.get(VERSION_KEY) == "1"

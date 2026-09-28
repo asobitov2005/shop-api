@@ -1,9 +1,11 @@
 from decimal import Decimal
 
+import redis
 from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.db import make_session_factory
+from app.products.cache import ProductCache
 from app.products.models import Product
 
 SEED_PRODUCTS = (
@@ -14,13 +16,25 @@ SEED_PRODUCTS = (
 
 
 def seed() -> None:
-    factory = make_session_factory(get_settings().database_url)
-    with factory.begin() as session:
-        for name, price, stock in SEED_PRODUCTS:
-            exists = session.scalar(select(Product.id).where(Product.name == name))
-            if exists is None:
-                session.add(Product(name=name, price=price, stock=stock))
-    factory.kw["bind"].dispose()
+    settings = get_settings()
+    factory = make_session_factory(settings.database_url)
+    inserted = False
+    try:
+        with factory.begin() as session:
+            for name, price, stock in SEED_PRODUCTS:
+                exists = session.scalar(select(Product.id).where(Product.name == name))
+                if exists is None:
+                    session.add(Product(name=name, price=price, stock=stock))
+                    inserted = True
+    finally:
+        factory.kw["bind"].dispose()
+
+    if inserted:
+        client = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+        try:
+            ProductCache(client).invalidate()
+        finally:
+            client.close()
 
 
 if __name__ == "__main__":
