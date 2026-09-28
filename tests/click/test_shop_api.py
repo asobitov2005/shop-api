@@ -7,6 +7,14 @@ from app.products.models import Product
 from tests.click.shop_helpers import click_settings, complete, order, prepare
 
 
+def test_click_exposes_one_callback_url(client):
+    paths = client.get("/openapi.json").json()["paths"]
+
+    assert "/payments/click/callback" in paths
+    assert "/payments/click/prepare" not in paths
+    assert "/payments/click/complete" not in paths
+
+
 def test_prepare_retry_with_new_sign_time_keeps_same_local_id(client, db_session):
     settings = click_settings(client)
     order_id, _ = order(client, db_session)
@@ -22,7 +30,7 @@ def test_prepare_retry_with_new_sign_time_keeps_same_local_id(client, db_session
         "sign_time": "2026-09-28 12:35:00",
     }
     retry_fields["sign_string"] = prepare_signature(retry_fields, "secret")
-    retry = client.post("/payments/click/prepare", data=retry_fields)
+    retry = client.post("/payments/click/callback", data=retry_fields)
 
     assert first.status_code == retry.status_code == 200
     assert first.json()["error"] == retry.json()["error"] == 0
@@ -67,7 +75,7 @@ def test_invalid_signature_and_wrong_amount_do_not_create_payment(client, db_ses
         "sign_time": "2026-09-28 12:30:00",
         "sign_string": "0" * 32,
     }
-    invalid = client.post("/payments/click/prepare", data=bad_fields)
+    invalid = client.post("/payments/click/callback", data=bad_fields)
     wrong_amount = prepare(client, order_id, settings, transaction_id="103", amount="1.00")
 
     assert bad.status_code == 200 and bad.json()["error"] == 0
@@ -89,7 +97,7 @@ def test_prepare_rejects_wrong_service_and_unknownorder(client, db_session):
         "sign_time": "2026-09-28 12:30:00",
     }
     fields["sign_string"] = prepare_signature(fields, "secret")
-    wrong_service = client.post("/payments/click/prepare", data=fields)
+    wrong_service = client.post("/payments/click/callback", data=fields)
     unknown_order = prepare(client, 999999, settings, transaction_id="105")
 
     assert wrong_service.status_code == 200 and wrong_service.json()["error"] == -3
@@ -128,7 +136,7 @@ def test_complete_rejects_unknown_prepare_without_changingorder(client, db_sessi
     }
     fields["sign_string"] = complete_signature(fields, settings.click_secret_key)
 
-    response = client.post("/payments/click/complete", data=fields)
+    response = client.post("/payments/click/callback", data=fields)
 
     assert response.status_code == 200
     assert response.json()["error"] == -6
@@ -152,7 +160,7 @@ def test_oversized_transaction_identifier_returns_json_error_not_server_error(cl
     }
     fields["sign_string"] = prepare_signature(fields, settings.click_secret_key)
 
-    response = client.post("/payments/click/prepare", data=fields)
+    response = client.post("/payments/click/callback", data=fields)
 
     assert response.status_code == 200
     assert response.json()["error"] == -5
@@ -162,7 +170,7 @@ def test_oversized_transaction_identifier_returns_json_error_not_server_error(cl
 
 def test_malformed_form_returns_click_json_error(client):
     response = client.post(
-        "/payments/click/prepare",
+        "/payments/click/callback",
         content=b"broken",
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )

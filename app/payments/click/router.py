@@ -50,31 +50,27 @@ async def _fields(request: Request) -> dict[str, str]:
     return parse_click_form(await request.body())
 
 
-@router.post("/prepare", response_model=PrepareResponse)
-async def prepare(
+@router.post("/callback", response_model=PrepareResponse | CompleteResponse)
+async def callback(
     request: Request,
     session: Session = Depends(get_session),  # noqa: B008
-) -> PrepareResponse:
+) -> PrepareResponse | CompleteResponse:
     fields: dict[str, str] = {}
     try:
         fields = await _fields(request)
-        payload = PrepareFields.model_validate(fields)
     except (ValueError, ValidationError):
         return _prepare_error(fields)
     cache = ProductCache(request.app.state.redis)
-    return process_prepare(session, payload, request.app.state.settings, cache)
-
-
-@router.post("/complete", response_model=CompleteResponse)
-async def complete(
-    request: Request,
-    session: Session = Depends(get_session),  # noqa: B008
-) -> CompleteResponse:
-    fields: dict[str, str] = {}
-    try:
-        fields = await _fields(request)
-        payload = CompleteFields.model_validate(fields)
-    except (ValueError, ValidationError):
-        return _complete_error(fields)
-    cache = ProductCache(request.app.state.redis)
-    return process_complete(session, payload, request.app.state.settings, cache)
+    if fields.get("action") == "0":
+        try:
+            payload = PrepareFields.model_validate(fields)
+        except ValidationError:
+            return _prepare_error(fields)
+        return process_prepare(session, payload, request.app.state.settings, cache)
+    if fields.get("action") == "1":
+        try:
+            payload = CompleteFields.model_validate(fields)
+        except ValidationError:
+            return _complete_error(fields)
+        return process_complete(session, payload, request.app.state.settings, cache)
+    return _prepare_error(fields)

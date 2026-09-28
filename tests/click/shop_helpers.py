@@ -36,7 +36,7 @@ def prepare(client, order_id, settings, *, transaction_id="101", amount="12000.0
         "sign_time": "2026-09-28 12:30:00",
     }
     fields["sign_string"] = prepare_signature(fields, settings.click_secret_key)
-    return client.post("/payments/click/prepare", data=fields)
+    return client.post("/payments/click/callback", data=fields)
 
 
 def complete(
@@ -64,4 +64,4 @@ def complete(
         "sign_time": "2026-09-28 12:31:00",
     }
     fields["sign_string"] = complete_signature(fields, settings.click_secret_key)
-    return client.post("/payments/click/complete", data=fields)
+    return client.post("/payments/click/callback", data=fields)

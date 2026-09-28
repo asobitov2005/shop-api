@@ -13,18 +13,18 @@ docker compose run --rm api ruff check .
 docker compose run --rm api ruff format --check .
 ```
 
-The API is at `http://localhost:58000/docs`. API startup applies Alembic migrations automatically. Seed products are Choy (15,000.00 UZS), Qahva (25,000.00 UZS) and Asal (45,000.00 UZS). The seed is idempotent. Tests use a dedicated `_test` PostgreSQL database and separate Redis database.
+The API is at `http://localhost:58000/docs`; `/` opens the shop. API startup applies Alembic migrations automatically. Choy, Qahva and Asal each sell for 1,000 UZS. The database keeps each original price and discount amount, and the seed is idempotent. Tests use a dedicated `_test` PostgreSQL database and separate Redis database.
 
 Copy `.env.example` to a private `.env` to configure Click. Never commit merchant keys. The simulated payment callback uses `TASK_WEBHOOK_SECRET`: sign the exact JSON request bytes with HMAC-SHA256 and send the lowercase hex digest as `X-Signature`. Callback `status` values are `success` and `failed`; failure cancels a pending order and releases stock.
 
 ## Click integration
 
-With Click credentials configured, `POST /orders` returns a [Payment Link](https://docs.click.uz/en/click-button/) URL containing the order ID and UZS total. Click calls `POST /payments/click/prepare` and `POST /payments/click/complete` using the [Shop API](https://docs.click.uz/en/shop-api/requests) protocol and MD5 signatures. These are separate from the simulated HMAC callback. A browser return URL does not confirm payment.
+With Click credentials configured, `POST /orders` returns a [Payment Link](https://docs.click.uz/en/click-button/) URL containing the order ID and UZS total. Click sends both Shop API stages to `POST /payments/click/callback`; the `action` field routes Prepare (`0`) and Complete (`1`). Requests use Click's MD5 signatures and remain separate from the task's simulated HMAC callback. A browser return URL does not confirm payment.
 
-For this deployment, set Click's Prepare and Complete callback URLs to `https://shop.testnest.uz/payments/click/prepare` and `https://shop.testnest.uz/payments/click/complete` in the merchant cabinet.
+For this deployment, set Click's callback URL to `https://shop.testnest.uz/payments/click/callback` in the merchant cabinet.
 
 ## Design and limits
 
 - PostgreSQL owns stock, order and payment state. Product rows are locked in ID order; callback and worker lock orders before status changes. Redis only caches product pages.
-- Decimal money and stored item prices keep totals stable. A payment transaction is recorded once per provider transaction ID. Code is split by feature; the worker uses the same image as the API.
+- Decimal money and stored item prices keep totals stable. Product rows store sale price, original price and discount amount with a consistency constraint. A payment transaction is recorded once per provider transaction ID. Code is split by feature; the worker uses the same image as the API.
 - With more time: add customer authentication, metrics and provider-approved live payment tests. A late successful Click charge is stored with `recovery_status=manual_review` for operator reconciliation: the public docs do not clearly map Shop IDs to the Merchant API reversal `payment_id`. Check the API service log and these database rows; do not assume a refund occurred.
