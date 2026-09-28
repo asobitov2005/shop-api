@@ -24,4 +24,4 @@ class OrderView(BaseModel):
     total_amount: Decimal
     currency: Literal["UZS"]
     expires_at: datetime
-    payment_url: None = None
+    payment_url: str | None = None
