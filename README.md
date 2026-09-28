@@ -34,6 +34,8 @@ The API is available at `http://localhost:58000`. The Compose file also starts P
 docker compose exec api python -m app.seed
 ```
 
+The seed creates Uzbek-so'm products: Choy (15,000.00 UZS), Qahva (25,000.00 UZS), and Asal (45,000.00 UZS). All stored product prices, order totals, item price snapshots, and payment amounts are UZS. There is no currency conversion.
+
 ## Run the checks
 
 ```bash
@@ -58,7 +60,7 @@ The response includes its stored total, `pending` status, expiry time and `payme
 
 For the simulated callback, `status` is `success` or `failed`. The DOCX specifies the field but does not define its values; this project uses `success` to mark the pending order paid and `failed` to cancel it and release stock. Sign the **exact JSON bytes** sent in the request with `TASK_WEBHOOK_SECRET` and send the lowercase hexadecimal digest in `X-Signature`. A repeated valid transaction returns its prior outcome without applying stock/payment changes again.
 
-For example, after creating order `1` with a stored total of `5.00`, this sends a signed success callback. Export the same `TASK_WEBHOOK_SECRET` configured for the API before running it:
+For example, after creating order `1` for one Choy with a stored total of `15000.00` UZS, this sends a signed success callback. Export the same `TASK_WEBHOOK_SECRET` configured for the API before running it:
 
 ```python
 import hashlib
@@ -66,7 +68,7 @@ import hmac
 import os
 from urllib.request import Request, urlopen
 
-body = b'{"transaction_id":"demo-1","order_id":1,"amount":"5.00","status":"success"}'
+body = b'{"transaction_id":"demo-1","order_id":1,"amount":"15000.00","status":"success"}'
 signature = hmac.new(os.environ["TASK_WEBHOOK_SECRET"].encode(), body, hashlib.sha256).hexdigest()
 request = Request(
     "http://localhost:58000/payments/callback",
