@@ -1,6 +1,6 @@
 import os
 from collections.abc import Generator
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 import redis
@@ -51,16 +51,36 @@ def db_session(test_engine) -> Generator[Session, None, None]:
     session.close()
 
 
+def _redis_database(url: str) -> int:
+    parsed = urlparse(url)
+    query_database = parse_qs(parsed.query).get("db", [None])[0]
+    path_database = parsed.path.strip("/") or "0"
+    try:
+        return int(query_database if query_database is not None else path_database)
+    except ValueError as error:
+        raise RuntimeError("Redis URLs must select a numeric database") from error
+
+
+def _same_redis_database(runtime_url: str, test_url: str) -> bool:
+    runtime_client = redis.Redis.from_url(runtime_url)
+    test_client = redis.Redis.from_url(test_url)
+    try:
+        runtime_id = runtime_client.info("server").get("run_id")
+        test_id = test_client.info("server").get("run_id")
+        if not runtime_id or not test_id:
+            raise RuntimeError("Redis server identity is unavailable")
+        return runtime_id == test_id and _redis_database(runtime_url) == _redis_database(test_url)
+    except redis.RedisError as error:
+        raise RuntimeError("Cannot verify Redis server identity; refusing test cleanup") from error
+    finally:
+        runtime_client.close()
+        test_client.close()
+
+
 @pytest.fixture
 def redis_client(test_settings):
-    runtime = urlparse(test_settings.redis_url)
-    isolated = urlparse(test_settings.test_redis_url)
-    if (runtime.hostname, runtime.port, runtime.path) == (
-        isolated.hostname,
-        isolated.port,
-        isolated.path,
-    ):
-        raise RuntimeError("TEST_REDIS_URL must use a separate Redis database")
+    if _same_redis_database(test_settings.redis_url, test_settings.test_redis_url):
+        raise RuntimeError("TEST_REDIS_URL points to the runtime Redis database")
     client = redis.Redis.from_url(test_settings.test_redis_url, decode_responses=True)
     client.flushdb()
     yield client

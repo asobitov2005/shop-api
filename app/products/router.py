@@ -18,7 +18,7 @@ def list_products(
     session: Session = Depends(get_session),  # noqa: B008
 ) -> dict:
     cache = ProductCache(request.app.state.redis)
-    cached = cache.get(page, page_size)
+    cached, cache_version = cache.get(page, page_size)
     if cached is not None:
         return cached
     total = session.scalar(select(func.count()).select_from(Product)) or 0
@@ -28,5 +28,5 @@ def list_products(
     payload = ProductPage(items=rows, total=total, page=page, page_size=page_size).model_dump(
         mode="json"
     )
-    cache.set(page, page_size, payload)
+    cache.set(page, page_size, payload, cache_version)
     return payload
