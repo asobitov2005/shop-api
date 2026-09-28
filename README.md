@@ -38,4 +38,4 @@ For this deployment, set Click's Prepare and Complete callback URLs to `https://
 
 - PostgreSQL owns stock, order and payment state. Product rows are locked in ID order; callback and worker lock orders before status changes. Redis only caches product pages.
 - Decimal money and stored item prices keep totals stable. A payment transaction is recorded once per provider transaction ID. Code is split by feature; the worker uses the same image as the API.
-- With more time: add customer authentication, metrics and provider-approved live payment tests. A late successful Click charge needing reversal is recorded for manual reconciliation: the public docs do not clearly map Shop IDs to the Merchant API reversal `payment_id`.
+- With more time: add customer authentication, metrics and provider-approved live payment tests. A late successful Click charge is stored with `recovery_status=manual_review` for operator reconciliation: the public docs do not clearly map Shop IDs to the Merchant API reversal `payment_id`. Check the API service log and these database rows; do not assume a refund occurred.
