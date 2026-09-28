@@ -1,0 +1,94 @@
+import os
+from collections.abc import Generator
+from urllib.parse import urlparse
+
+import pytest
+import redis
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.core.config import Settings
+from app.core.db import Base, get_session
+from app.main import create_app
+from app.orders import models as order_models  # noqa: F401
+
+
+@pytest.fixture(scope="session")
+def test_settings() -> Settings:
+    settings = Settings()
+    url = os.getenv("TEST_DATABASE_URL", settings.test_database_url)
+    database = url.rsplit("/", 1)[-1].split("?", 1)[0]
+    if not database.endswith("_test"):
+        raise RuntimeError("TEST_DATABASE_URL must name a database ending in '_test'")
+    return settings.model_copy(update={"test_database_url": url})
+
+
+@pytest.fixture(scope="session")
+def test_engine(test_settings):
+    engine = create_engine(test_settings.test_database_url, pool_pre_ping=True)
+    with engine.connect() as connection:
+        current_db = connection.execute(text("SELECT current_database()")).scalar_one()
+        if not current_db.endswith("_test"):
+            raise RuntimeError("Refusing to reset a database without the '_test' suffix")
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    yield engine
+    Base.metadata.drop_all(engine)
+    engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def clear_test_data(test_engine):
+    with test_engine.begin() as connection:
+        connection.execute(text("TRUNCATE order_items, orders, products RESTART IDENTITY CASCADE"))
+
+
+@pytest.fixture
+def db_session(test_engine) -> Generator[Session, None, None]:
+    session = Session(bind=test_engine, expire_on_commit=False)
+    yield session
+    session.close()
+
+
+@pytest.fixture
+def redis_client(test_settings):
+    runtime = urlparse(test_settings.redis_url)
+    isolated = urlparse(test_settings.test_redis_url)
+    if (runtime.hostname, runtime.port, runtime.path) == (
+        isolated.hostname,
+        isolated.port,
+        isolated.path,
+    ):
+        raise RuntimeError("TEST_REDIS_URL must use a separate Redis database")
+    client = redis.Redis.from_url(test_settings.test_redis_url, decode_responses=True)
+    client.flushdb()
+    yield client
+    client.flushdb()
+    client.close()
+
+
+@pytest.fixture
+def client(test_engine, redis_client, test_settings):
+    app = create_app(test_settings, redis_client)
+    factory = sessionmaker(bind=test_engine, expire_on_commit=False)
+
+    def session_override():
+        with factory() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = session_override
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def seed_products(db_session):
+
+    def seed(*products):
+        db_session.add_all(products)
+        db_session.flush()
+        return products
+
+    return seed
