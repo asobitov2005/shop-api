@@ -5,6 +5,8 @@ from fastapi import FastAPI
 
 from app.core.config import Settings, get_settings
 from app.orders.router import router as orders_router
+from app.payments.click.router import router as click_router
+from app.payments.router import router as payments_router
 from app.products.router import router as products_router
 
 
@@ -22,8 +24,11 @@ def create_app(settings: Settings | None = None, redis_client=None) -> FastAPI:
             app.state.redis.close()
 
     app = FastAPI(title="Shop API", lifespan=lifespan, root_path=configured.app_root_path)
+    app.state.settings = configured
     app.include_router(products_router)
     app.include_router(orders_router)
+    app.include_router(payments_router)
+    app.include_router(click_router)
     return app
 
 
