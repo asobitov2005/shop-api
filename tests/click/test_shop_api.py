@@ -15,6 +15,45 @@ def test_click_exposes_one_callback_url(client):
     assert "/payments/click/complete" not in paths
 
 
+def test_official_click_field_sets_prepare_and_complete_order(client, db_session):
+    settings = click_settings(client)
+    order_id, _ = order(client, db_session)
+    fields = {
+        "click_trans_id": "901",
+        "service_id": settings.click_service_id,
+        "click_paydoc_id": "902",
+        "merchant_trans_id": str(order_id),
+        "amount": "12000.00",
+        "action": "0",
+        "error": "0",
+        "error_note": "Success",
+        "sign_time": "2026-09-28 12:30:00",
+    }
+    fields["sign_string"] = prepare_signature(fields, settings.click_secret_key)
+
+    response = client.post("/payments/click/callback", data=fields)
+
+    assert response.status_code == 200
+    assert response.json()["error"] == 0
+    prepare_id = response.json()["merchant_prepare_id"]
+    assert prepare_id > 0
+    assert db_session.scalar(select(PaymentTransaction)).order_id == order_id
+
+    complete_fields = {
+        **fields,
+        "merchant_prepare_id": str(prepare_id),
+        "action": "1",
+        "sign_time": "2026-09-28 12:31:00",
+    }
+    complete_fields["sign_string"] = complete_signature(complete_fields, settings.click_secret_key)
+    completed = client.post("/payments/click/callback", data=complete_fields)
+
+    assert completed.status_code == 200
+    assert completed.json()["error"] == 0
+    db_session.expire_all()
+    assert db_session.get(Order, order_id).status == "paid"
+
+
 def test_prepare_retry_with_new_sign_time_keeps_same_local_id(client, db_session):
     settings = click_settings(client)
     order_id, _ = order(client, db_session)

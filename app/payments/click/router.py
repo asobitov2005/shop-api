@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, Request
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -14,6 +16,16 @@ from app.payments.click.schemas import (
 from app.products.cache import ProductCache
 
 router = APIRouter(prefix="/payments/click")
+logger = logging.getLogger(__name__)
+
+
+def _log_error(fields: dict[str, str], error: int) -> None:
+    logger.warning(
+        "Click callback rejected: action=%s order_id=%s error=%s",
+        fields.get("action", "?"),
+        fields.get("merchant_trans_id", "?"),
+        error,
+    )
 
 
 def _integer(value: str | None) -> int:
@@ -59,18 +71,28 @@ async def callback(
     try:
         fields = await _fields(request)
     except (ValueError, ValidationError):
+        _log_error(fields, -1)
         return _prepare_error(fields)
     cache = ProductCache(request.app.state.redis)
     if fields.get("action") == "0":
         try:
             payload = PrepareFields.model_validate(fields)
         except ValidationError:
+            _log_error(fields, -1)
             return _prepare_error(fields)
-        return process_prepare(session, payload, request.app.state.settings, cache)
+        response = process_prepare(session, payload, request.app.state.settings, cache)
+        if response.error:
+            _log_error(fields, response.error)
+        return response
     if fields.get("action") == "1":
         try:
             payload = CompleteFields.model_validate(fields)
         except ValidationError:
+            _log_error(fields, -1)
             return _complete_error(fields)
-        return process_complete(session, payload, request.app.state.settings, cache)
+        response = process_complete(session, payload, request.app.state.settings, cache)
+        if response.error:
+            _log_error(fields, response.error)
+        return response
+    _log_error(fields, -1)
     return _prepare_error(fields)

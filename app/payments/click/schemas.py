@@ -2,11 +2,11 @@ from pydantic import BaseModel, ConfigDict
 
 
 class PrepareFields(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     click_trans_id: str
     service_id: str
-    click_user_id: str
+    click_user_id: str | None = None
     merchant_trans_id: str
     amount: str
     action: str
