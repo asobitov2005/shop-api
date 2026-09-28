@@ -21,7 +21,13 @@ Copy `.env.example` to a private `.env` to configure Click. Never commit merchan
 
 With Click credentials configured, `POST /orders` returns a [Payment Link](https://docs.click.uz/en/click-button/) URL containing the order ID and UZS total. Click sends both Shop API stages to `POST /payments/click/callback`; the `action` field routes Prepare (`0`) and Complete (`1`). Requests use Click's MD5 signatures and remain separate from the task's simulated HMAC callback. A browser return URL does not confirm payment.
 
-For this deployment, set Click's callback URL to `https://shop.testnest.uz/payments/click/callback` in the merchant cabinet.
+## Live mode
+
+- Shop: https://shop.testnest.uz/
+- API docs: https://shop.testnest.uz/docs
+- Click Prepare and Complete callback: https://shop.testnest.uz/payments/click/callback
+
+The live shop uses private Click merchant credentials. Select a product to create an order and open Click checkout; the signed Complete callback confirms payment in the database.
 
 ## Technologies
 
