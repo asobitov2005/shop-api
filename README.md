@@ -23,8 +23,14 @@ With Click credentials configured, `POST /orders` returns a [Payment Link](https
 
 For this deployment, set Click's callback URL to `https://shop.testnest.uz/payments/click/callback` in the merchant cabinet.
 
-## Design and limits
+## Technologies
 
-- PostgreSQL owns stock, order and payment state. Product rows are locked in ID order; callback and worker lock orders before status changes. Redis only caches product pages.
-- Decimal money and stored item prices keep totals stable. Product rows store sale price, original price and discount amount with a consistency constraint. A payment transaction is recorded once per provider transaction ID. Code is split by feature; the worker uses the same image as the API.
-- With more time: add customer authentication, metrics and provider-approved live payment tests. A late successful Click charge is stored with `recovery_status=manual_review` for operator reconciliation: the public docs do not clearly map Shop IDs to the Merchant API reversal `payment_id`. Check the API service log and these database rows; do not assume a refund occurred.
+| Technology | Where and why it is used |
+| --- | --- |
+| Python and FastAPI | `app/`: product, order and payment callback endpoints. |
+| PostgreSQL | Stores products, reserved stock, orders and payments; transactions protect concurrent orders. |
+| Redis | Caches product pages and clears stale data when stock changes. |
+| Python background worker | `app/worker/`: cancels pending orders after 15 minutes and restores stock. |
+| HMAC-SHA256 | Verifies the signature of `POST /payments/callback`. |
+| Docker Compose | Starts the API, PostgreSQL, Redis and worker together. |
+| pytest | `tests/`: checks concurrent orders, repeated callbacks and invalid signatures. |
