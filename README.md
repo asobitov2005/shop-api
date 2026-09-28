@@ -1,93 +1,41 @@
 # Shop API
 
-An order and payment REST API for the supplied **Backend Developer Test Task — Order & Payment Service**. The required provider callback is simulated. Click Payment Link and Click Shop API are additional integration paths that use the same order and stock rules.
+FastAPI order and payment service for the supplied **Backend Developer Test Task — Order & Payment Service**. All database prices, order totals and payment amounts are in Uzbek so'm (`UZS`). Source: [GitHub repository](https://github.com/asobitov2005/shop-api).
 
-## What the DOCX requires
+## Task requirements
 
-| Area | Exact task requirement | Project behavior |
-| --- | --- | --- |
-| Products | `GET /products` returns a paginated list containing `id`, `name`, `price`, and `stock`. Cache the list in Redis and invalidate it when stock changes. | Page and page-size parameters, Redis cache, invalidation on reservation and release. |
-| Orders | `POST /orders` receives a list of `{product_id, quantity}`. Reserve stock immediately; start the order in `pending`. Two buyers competing for the last unit must not both succeed; stock must never be negative. | One PostgreSQL transaction locks product rows, validates quantities and availability, stores price snapshots, and reserves stock. |
-| Payment callback | `POST /payments/callback` receives `{transaction_id, order_id, amount, status}`. `X-Signature` contains HMAC-SHA256 of the request body with a shared secret. Reject a bad signature or amount mismatch. Repeated callbacks must process the order only once; successful payment changes it to `paid`. | Verify the signature against the original body bytes, compare the amount with the stored order total, and record provider transaction IDs for idempotency. |
-| Background job | Cancel orders still `pending` after 15 minutes and release their reserved stock. | A separate worker checks expiry and performs a locked, one-time cancellation. |
-| Automated tests | Cover two concurrent buyers of the last item, repeated delivery of the same callback, and an invalid signature. | PostgreSQL-backed integration tests cover these and related stock/payment races. |
-| Delivery | A public/shared GitHub repository, `docker-compose.yml` starting API, PostgreSQL, Redis and worker, plus a README describing setup, tests, design choices and improvements. | See the commands and design notes below. |
+| Requirement from the DOCX | Implementation |
+| --- | --- |
+| Paginated `GET /products` with `id`, `name`, `price`, `stock`; Redis cache invalidated on stock changes | Redis page cache; invalidation after reservation or release |
+| `POST /orders` with `{product_id, quantity}` items; reserve stock, start `pending`, prevent two buyers taking the last unit | PostgreSQL row locks and one transaction; stock cannot go negative |
+| `POST /payments/callback` with `{transaction_id, order_id, amount, status}` and `X-Signature` HMAC-SHA256 over the raw body | Signature and amount verification; transaction ID makes 3–5 retries idempotent; success marks `paid` |
+| Cancel `pending` orders after 15 minutes and restore stock | Separate worker with locked expiry batches |
+| Tests for concurrent last-item orders, repeated callbacks and invalid signatures | PostgreSQL-backed tests cover these cases and related races |
+| Docker Compose starts API, PostgreSQL, Redis and worker; README explains run, tests, decisions and improvements | Commands and notes below |
 
-The task's estimate is **4–6 hours**, with a deadline of **48 hours from receipt**. The Click extension adds work beyond that estimate.
-
-## Click extension
-
-When Click merchant settings are configured, a newly created order includes a Click payment URL. The URL sends the customer to Click with the stored order ID and amount. Click then calls `POST /payments/click/prepare` and `POST /payments/click/complete`; these endpoints implement Click's form fields, MD5 `sign_string`, JSON responses and documented error codes. The task's `/payments/callback` remains available with its separate HMAC-SHA256 contract. A browser redirect to `return_url` does not prove payment.
-
-The Click integration follows the official [Payment Link](https://docs.click.uz/en/click-button/), [Shop API requests](https://docs.click.uz/en/shop-api/requests), [Shop API errors](https://docs.click.uz/en/shop-api/errors) and, where a completed charge needs recovery, [Merchant API requests](https://docs.click.uz/en/merchant-api/requests).
-
-## Run locally
+## Run and test
 
 ```bash
 docker compose up --build -d
-docker compose ps
-```
-
-The API is available at `http://localhost:58000`. The Compose file also starts PostgreSQL, Redis and the expiry worker. Copy `.env.example` to `.env` to override development defaults and to configure Click. `.env` is excluded from Git; never commit merchant secrets. After startup, add example products with:
-
-```bash
+docker compose exec api alembic current
 docker compose exec api python -m app.seed
-```
-
-The seed creates Uzbek-so'm products: Choy (15,000.00 UZS), Qahva (25,000.00 UZS), and Asal (45,000.00 UZS). All stored product prices, order totals, item price snapshots, and payment amounts are UZS. There is no currency conversion.
-
-## Run the checks
-
-```bash
 docker compose run --rm api pytest -q
 docker compose run --rm api ruff check .
 docker compose run --rm api ruff format --check .
 ```
 
-Tests use a dedicated PostgreSQL database ending in `_test` and a separate Redis test DB. They refuse to reset a database without the `_test` suffix. Authored code files are kept under the requested 300-line maximum, checked during review with `wc -l`.
+The API is at `http://localhost:58000/docs`. API startup applies Alembic migrations automatically. Seed products are Choy (15,000.00 UZS), Qahva (25,000.00 UZS) and Asal (45,000.00 UZS). The seed is idempotent. Tests use a dedicated `_test` PostgreSQL database and separate Redis database.
 
-## API examples
+Copy `.env.example` to a private `.env` to configure Click. Never commit merchant keys. The task callback uses `TASK_WEBHOOK_SECRET`: sign the exact JSON request bytes with HMAC-SHA256 and send the lowercase hex digest as `X-Signature`. Callback `status` values are `success` and `failed`; failure cancels a pending order and releases stock.
 
-Create an order:
+## Click integration
 
-```bash
-curl -X POST http://localhost:58000/orders \
-  -H 'Content-Type: application/json' \
-  -d '{"items":[{"product_id":1,"quantity":2}]}'
-```
+With Click credentials configured, `POST /orders` returns a [Payment Link](https://docs.click.uz/en/click-button/) URL containing the order ID and UZS total. Click calls `POST /payments/click/prepare` and `POST /payments/click/complete` using the [Shop API](https://docs.click.uz/en/shop-api/requests) protocol and MD5 signatures. These are separate from the task's HMAC callback. A browser return URL does not confirm payment.
 
-The response includes its stored total, `pending` status, expiry time and `payment_url` when Click is configured. Product prices and totals come from the database; the client does not submit a trusted amount when placing an order.
+For this deployment, set Click's Prepare and Complete callback URLs to `https://shop.testnest.uz/payments/click/prepare` and `https://shop.testnest.uz/payments/click/complete` in the merchant cabinet.
 
-For the simulated callback, `status` is `success` or `failed`. The DOCX specifies the field but does not define its values; this project uses `success` to mark the pending order paid and `failed` to cancel it and release stock. Sign the **exact JSON bytes** sent in the request with `TASK_WEBHOOK_SECRET` and send the lowercase hexadecimal digest in `X-Signature`. A repeated valid transaction returns its prior outcome without applying stock/payment changes again.
+## Design and limits
 
-For example, after creating order `1` for one Choy with a stored total of `15000.00` UZS, this sends a signed success callback. Export the same `TASK_WEBHOOK_SECRET` configured for the API before running it:
-
-```python
-import hashlib
-import hmac
-import os
-from urllib.request import Request, urlopen
-
-body = b'{"transaction_id":"demo-1","order_id":1,"amount":"15000.00","status":"success"}'
-signature = hmac.new(os.environ["TASK_WEBHOOK_SECRET"].encode(), body, hashlib.sha256).hexdigest()
-request = Request(
-    "http://localhost:58000/payments/callback",
-    data=body,
-    headers={"Content-Type": "application/json", "X-Signature": signature},
-    method="POST",
-)
-with urlopen(request) as response:
-    print(response.read().decode())
-```
-
-## Design choices
-
-- PostgreSQL owns order, stock and payment state. Product rows are locked in ID order when stock is reserved; order rows are locked before payment or expiry transitions. This prevents overselling and double release.
-- Money uses `Decimal` and database `NUMERIC(12,2)`; each order item stores the product's price at order creation.
-- Redis only caches the paginated product list. A versioned cache key changes after committed stock updates; cached data is never the source of truth.
-- The worker runs as a separate process and cancels due pending orders in batches. No Celery broker or general event framework is needed for this task.
-- HTTP endpoints, order transitions and Click protocol code live in separate feature folders. Shared stock/payment rules are implemented once.
-
-## Improvements with more time
-
-Add authenticated customer accounts and order ownership, structured metrics/alerting for payment recovery, and a provider-approved live Click test suite. Any Click reversal must use a confirmed Merchant API `payment_id`; the public documentation does not unambiguously equate it with every Shop API identifier. Unknown network outcomes remain visible for reconciliation instead of being marked refunded without proof.
+- PostgreSQL owns stock, order and payment state. Product rows are locked in ID order; callback and worker lock orders before status changes. Redis only caches product pages.
+- Decimal money and stored item prices keep totals stable. A payment transaction is recorded once per provider transaction ID. Code is split by feature; the worker uses the same image as the API.
+- With more time: add customer authentication, metrics and provider-approved live payment tests. A late successful Click charge needing reversal is recorded for manual reconciliation: the public docs do not clearly map Shop IDs to the Merchant API reversal `payment_id`.
